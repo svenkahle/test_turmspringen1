@@ -1,0 +1,1534 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Turmspringen">
+    <title>🏊 Turmspringen</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:#ddeef8; --surface:#c8e0f0; --surface2:#b8d4e8; --border:#90b8d4;
+            --text:#0d2236; --text-mid:#2a4a62; --text-muted:#5a7a92; --accent:#0055aa;
+            --header-h:50px; --sidebar-w:46px; --cell-w:104px;
+            --lr-dim:#ddb0b0; --lr-lit:#dd2020; --lr-glow:rgba(200,30,30,.45);
+            --ly-dim:#ddd090; --ly-lit:#c89000; --ly-glow:rgba(200,140,0,.45);
+            --lg-dim:#90c8a0; --lg-lit:#158840; --lg-glow:rgba(15,140,60,.45);
+            --sub-r-bg:#f5dada; --sub-r-bd:#e0a0a0;
+            --sub-y-bg:#f8f0c8; --sub-y-bd:#ccb040;
+            --sub-g-bg:#cceedc; --sub-g-bd:#70b890;
+        }
+        * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+        body { font-family:'Barlow',sans-serif; background:var(--bg); color:var(--text); }
+
+        /* HEADER */
+        .app-header {
+            position:sticky; top:0; z-index:200;
+            height:var(--header-h); background:#1a4a72; border-bottom:2px solid #0d2e4a;
+            display:flex; align-items:center; padding:0 14px; gap:12px;
+        }
+        .app-title { font-family:'Barlow Condensed',sans-serif; font-size:1.2rem; font-weight:800;
+            letter-spacing:.1em; text-transform:uppercase; color:#fff; flex-shrink:0; }
+        .hpw { flex:1; display:flex; flex-direction:column; gap:3px; }
+        .hpt { font-family:'Barlow Condensed',sans-serif; font-size:.72rem; color:#90c8f0; }
+        .pb-bg { height:5px; background:#0d2e4a; border-radius:3px; overflow:hidden; }
+        .pb-fill { height:100%; background:linear-gradient(90deg,#00aaff,#66ddff);
+                   border-radius:3px; transition:width .4s ease; }
+
+        /* LAYOUT */
+        .app-body { display:flex; align-items:flex-start; }
+        .height-sidebar {
+            position:sticky; top:var(--header-h);
+            height:calc(100dvh - var(--header-h));
+            width:var(--sidebar-w); flex-shrink:0;
+            background:#1a4a72; border-right:2px solid #0d2e4a;
+            display:flex; flex-direction:column;
+            overflow-y:auto; overflow-x:hidden;   /* scrollbar wenn viele Höhen */
+            z-index:100;
+            scrollbar-width:none;                  /* Firefox: keine Scrollbar sichtbar */
+        }
+        .height-sidebar::-webkit-scrollbar { display:none; }
+        /* Feste Tab-Höhe statt flex:1 → Tabs werden kompakt und gleichmässig */
+        .height-tab {
+            height:46px; flex-shrink:0;
+            display:flex; align-items:center; justify-content:center;
+            cursor:pointer; border-left:3px solid transparent;
+            transition:background .15s,border-color .15s; position:relative;
+        }
+        .height-tab span {
+            font-family:'Barlow Condensed',sans-serif; font-size:.78rem; font-weight:700;
+            color:#90b8d8; transition:color .15s;
+            text-align:center; line-height:1.1;
+        }
+        .height-tab:hover { background:#22597f; }
+        .height-tab:hover span { color:#fff; }
+        .height-tab.active { background:#2a6a96; border-left-color:#66ddff; }
+        .height-tab.active span { color:#fff; }
+        .h-dot { position:absolute; bottom:4px; width:5px; height:5px;
+                 border-radius:50%; background:transparent; transition:background .3s; }
+        .h-dot.on { background:var(--lg-lit); }
+        /* Einfüge-Indikatoren für Höhen-Drag */
+        .height-tab.drag-over-top { border-top:3px solid #66ddff !important; }
+        .height-tab.drag-over-bot { border-bottom:3px solid #66ddff !important; }
+        /* Drag-Ghost: transparenter Klon der dem Finger folgt */
+        #heightDragGhost {
+            position:fixed; z-index:9999; pointer-events:none;
+            width:var(--sidebar-w); background:#2a6a96;
+            border-left:3px solid #66ddff;
+            display:flex; align-items:center; justify-content:center;
+            height:46px; opacity:.85; font-family:'Barlow Condensed',sans-serif;
+            font-size:.78rem; font-weight:700; color:#fff;
+            box-shadow:2px 0 12px rgba(0,0,0,.4);
+        }
+        /* Trennlinie zwischen fixen und eigenen Höhen */
+        .height-divider {
+            height:1px; background:#2a5a80; margin:2px 6px; flex-shrink:0;
+        }
+        /* Plus-Tab zum Hinzufügen eigener Höhen */
+        .height-add-tab {
+            height:36px; flex-shrink:0;
+            display:flex; align-items:center; justify-content:center;
+            cursor:pointer; color:#5a8aaa; font-size:1.1rem; font-weight:300;
+            transition:background .15s, color .15s;
+        }
+        .height-add-tab:hover { background:#22597f; color:#fff; }
+        /* Editierbarer Höhen-Name (custom heights) */
+        .height-tab-input {
+            font-family:'Barlow Condensed',sans-serif; font-size:.78rem; font-weight:700;
+            color:#90b8d8; background:transparent; border:none; outline:none;
+            width:38px; text-align:center; cursor:text;
+        }
+        .height-tab.active .height-tab-input { color:#fff; }
+        /* Löschen-X auf custom height tab (erscheint bei hover) */
+        .height-tab-del {
+            position:absolute; top:2px; right:2px; font-size:.55rem;
+            color:#7090a8; cursor:pointer; opacity:0; transition:opacity .2s;
+            font-weight:900; line-height:1;
+        }
+        .height-tab:hover .height-tab-del { opacity:1; }
+
+        .main-content { flex:1; padding:10px 8px 40px;
+            display:flex; flex-direction:column; gap:12px; min-width:0; }
+
+        /* SEKTIONEN */
+        .dir-section { background:var(--surface); border:1.5px solid var(--border); border-radius:10px; }
+        .dir-heading {
+            font-family:'Barlow Condensed',sans-serif; font-size:1rem; font-weight:800;
+            letter-spacing:.1em; text-transform:uppercase; color:var(--accent);
+            background:var(--surface2); padding:8px 12px;
+            display:flex; align-items:center; justify-content:space-between;
+            border-radius:8px 8px 0 0; cursor:pointer; user-select:none;
+            border-bottom:1.5px solid var(--border);
+        }
+        .dir-section.collapsed .dir-heading { border-bottom:none; border-radius:8px; }
+        .dir-heading:hover { background:#aacce0; }
+        .h-left { display:flex; align-items:center; gap:10px; }
+        .toggle-arrow { font-size:.85rem; color:var(--text-muted); transition:transform .25s; }
+        .dir-section.collapsed .toggle-arrow { transform:rotate(-90deg); }
+        .dir-body { overflow:hidden; max-height:5000px; transition:max-height .3s ease; border-radius:0 0 8px 8px; }
+        .dir-section.collapsed .dir-body { max-height:0; }
+
+        /* STERNE – Anzeige in Richtungs-Header */
+        .stars-wrap { display:flex; gap:1px; align-items:center; flex-shrink:0; }
+        .star-slot {
+            position:relative; font-size:1.15rem; line-height:1;
+            color:#b0c8d8; display:inline-block; width:1.15rem; text-align:center;
+        }
+        /* Gefüllter Teil (über leerem Stern) */
+        .star-fill {
+            position:absolute; left:0; top:0; overflow:hidden;
+            color:#e8a000; white-space:nowrap; height:100%;
+        }
+
+        /* GITTER */
+        .grid-scroll { overflow-x:auto; padding:8px; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+        .grid-scroll::-webkit-scrollbar { height:4px; }
+        .grid-scroll::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+        /* Spalten: 46px Label (vertikal) | cell-w ohne | 10px Trenner | 9×cell-w mit */
+        .jump-grid {
+            display:grid;
+            grid-template-columns:46px var(--cell-w) 10px repeat(9, var(--cell-w));
+            gap:3px; width:max-content;
+        }
+
+        /* Gruppen-Header – BEIDE jetzt hellblau */
+        .gh {
+            font-family:'Barlow Condensed',sans-serif; font-size:.68rem; font-weight:700;
+            letter-spacing:.08em; text-transform:uppercase; text-align:center; padding:4px 6px;
+            border-radius:4px 4px 0 0;
+        }
+        .gh-ohne { color:#1a4a72; background:#b0cfe6; border:1.5px solid var(--border); border-bottom:none; }
+        /* "mit Schraube" jetzt auch hellblau */
+        .gh-mit  { color:#1a4a72; background:#b0cfe6; border:1.5px solid var(--border); border-bottom:none; grid-column:span 9; }
+
+        /* Spalten-Header – "mit Schraube" ebenfalls hellblau */
+        .ch { font-family:'Barlow Condensed',sans-serif; font-size:.58rem; text-align:center; padding:3px 2px; }
+        .ch-ohne { color:#1a4a72; background:#c0d8ec; border:1.5px solid var(--border); border-top:none; border-radius:0 0 2px 2px; }
+        .ch-mit  { color:#1a4a72; background:#c0d8ec; border:1.5px solid var(--border); border-top:none; border-radius:0 0 2px 2px; }
+
+        /* Zeilen-Label: äußeres div hält Grid-Platz, innerer Span wird als Ganzes
+           um -90° rotiert. Kein writing-mode, damit "½" nicht falsch gedreht wird. */
+        .row-label {
+            display:flex; align-items:center; justify-content:center;
+            overflow:visible;
+        }
+        .row-label-inner {
+            display:block; white-space:nowrap;
+            transform:rotate(-90deg);
+            font-family:'Barlow Condensed',sans-serif; font-size:.62rem; font-weight:700;
+            color:var(--text-mid);
+        }
+
+        .div-cell { display:flex; justify-content:center; align-items:stretch; }
+        .div-inner { width:2px; background:var(--border); border-radius:1px; height:100%; }
+
+        /* AUFGABEN-ZELLEN */
+        .jump-cell {
+            width:var(--cell-w); border:1.5px solid var(--border); border-radius:7px;
+            padding:4px; display:flex; flex-direction:column; gap:3px;
+            transition:background .25s,border-color .25s;
+        }
+        .jump-cell.cell-sichtbar { background:#b8c8d4 !important; border-color:#88a0b0 !important; opacity:.65; }
+        .jump-cell.cell-sichtbar .cell-code { color:#607080; }
+        .jump-cell.cell-hidden { background:transparent !important; border-color:transparent !important; visibility:hidden; pointer-events:none; }
+        .cell-code { font-family:'Barlow Condensed',sans-serif; font-size:.78rem; font-weight:800;
+            color:var(--text); text-align:center; padding:1px 0 2px; }
+
+        /* UNTERAUFGABEN */
+        .sub-task { width:100%; border:1px solid; border-radius:4px; padding:3px 5px;
+            display:flex; align-items:center; justify-content:space-between; gap:4px;
+            transition:background .2s,border-color .2s; }
+        .sub-label { font-family:'Barlow Condensed',sans-serif; font-size:.65rem; font-weight:700;
+            color:var(--text); flex-shrink:0; }
+        .sub-lamps { display:flex; gap:3px; align-items:center; }
+
+        .lamp { width:12px; height:12px; border-radius:50%; cursor:pointer;
+            transition:background-color .15s,box-shadow .15s,transform .1s; flex-shrink:0;
+            background-image:radial-gradient(circle at 33% 28%,rgba(255,255,255,.4),transparent 58%); }
+        .lamp:active { transform:scale(.82); }
+        .lamp-r     { background-color:var(--lr-dim); border:1.5px solid #b88080; }
+        .lamp-r.lit { background-color:var(--lr-lit); border-color:#ff8080; box-shadow:0 0 6px 2px var(--lr-glow); }
+        .lamp-y     { background-color:var(--ly-dim); border:1.5px solid #b8a040; }
+        .lamp-y.lit { background-color:var(--ly-lit); border-color:#ffe060; box-shadow:0 0 6px 2px var(--ly-glow); }
+        .lamp-g     { background-color:var(--lg-dim); border:1.5px solid #60a070; }
+        .lamp-g.lit { background-color:var(--lg-lit); border-color:#60ee98; box-shadow:0 0 6px 2px var(--lg-glow); }
+
+        .sub-task.sub-sichtbar { background:#c0cdd6 !important; border-color:#8aa0ae !important; cursor:default; }
+        .sub-task.sub-sichtbar .sub-label { color:#607080; }
+        .sub-task.sub-sichtbar .lamp { opacity:.3; pointer-events:none; cursor:default; }
+
+        /* LEGENDE */
+        .legend { display:flex; gap:8px; flex-wrap:wrap; padding:6px 8px 2px;
+            font-size:.65rem; font-family:'Barlow Condensed',sans-serif; color:var(--text-muted); }
+        .legend-item { display:flex; align-items:center; gap:4px; }
+        .legend-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+
+        /* ============================================================
+           EIGENE SPRÜNGE – Custom-Sektion
+        ============================================================ */
+        /* Scroll-Sperre NUR während aktivem Drag – gilt nur für main-content */
+        .custom-drag-active { overflow:hidden !important; touch-action:none !important; }
+        /* Sektions-Heading ist direkt draggable (wie Height-Tabs) */
+        .custom-section.sec-drag-over-top { border-top:3px solid #0055aa !important; }
+        .custom-section.sec-drag-over-bot { border-bottom:3px solid #0055aa !important; }
+        /* ── EIGENE SPRÜNGE ─────────────────────────────────────── */
+        .custom-section {
+            background:#d4e4ee; border:1.5px dashed #90b0c8; border-radius:10px;
+        }
+        .custom-heading {
+            font-family:'Barlow Condensed',sans-serif; font-size:1rem; font-weight:800;
+            letter-spacing:.1em; text-transform:uppercase;
+            background:#bcd0e0; padding:8px 12px;
+            display:flex; align-items:center; justify-content:space-between;
+            border-radius:8px 8px 0 0; border-bottom:1.5px dashed #90b0c8;
+            cursor:pointer; user-select:none;
+        }
+        .custom-section.collapsed .custom-heading { border-bottom:none; border-radius:8px; }
+        .custom-section.collapsed .toggle-arrow   { transform:rotate(-90deg); }
+        .custom-heading:hover { background:#aac0d4; }
+        .custom-title-input {
+            font-family:'Barlow Condensed',sans-serif; font-size:1rem; font-weight:800;
+            letter-spacing:.1em; text-transform:uppercase; color:#3a6080;
+            background:transparent; border:none; outline:none;
+            border-bottom:2px dashed transparent; cursor:text;
+            min-width:60px; max-width:220px; transition:border-color .2s;
+        }
+        .custom-title-input:focus { border-bottom-color:#5a90b0; }
+        /* Heading-rechts: Löschen-Sektion + Pfeil */
+        .custom-heading-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+        .custom-del-section {
+            font-size:.7rem; color:#a06060; cursor:pointer; font-weight:900;
+            opacity:.5; transition:opacity .2s;
+        }
+        .custom-del-section:hover { opacity:1; }
+        /* Body */
+        .custom-body {
+            overflow:hidden; max-height:2000px; transition:max-height .35s ease;
+        }
+        .custom-section.collapsed .custom-body { max-height:0 !important; }
+        .custom-body-inner {
+            padding:10px 10px 58px; position:relative; overflow-x:auto;
+        }
+        /* 5-spaltiges Raster */
+        .custom-grid {
+            display:grid; grid-template-columns:repeat(5,110px); gap:8px; width:max-content;
+        }
+        /* Leer-Slot */
+        .custom-slot {
+            width:110px; height:110px; border:1.5px dashed #aac0d0; border-radius:8px;
+            background:rgba(255,255,255,.25); transition:background .12s,border-color .12s;
+            box-sizing:border-box;
+        }
+        .custom-slot.drag-over { background:rgba(0,85,170,.12); border-color:#0055aa; }
+        /* Karte: quadratisch 110×110, Text oben, Lämpchen optisch zentriert */
+        .custom-card {
+            width:110px; height:110px; border-radius:8px;
+            padding:6px 6px 18px; box-sizing:border-box;
+            display:flex; flex-direction:column;
+            align-items:center; justify-content:space-between;
+            position:relative; border:1.5px solid #e0a0a0;
+            transition:background .2s,border-color .2s,opacity .15s;
+            user-select:none; touch-action:none; cursor:grab;
+        }
+        /* Lämpchen und Name: touch-action:auto damit Browser Clicks synthetisiert */
+        .custom-lamp-zone, .custom-card-name, .custom-card-del { touch-action:auto; }
+        .custom-card.dragging { opacity:.35; }
+        /* Schwebeklon */
+        #dragClone {
+            position:fixed; pointer-events:none; z-index:9999;
+            border-radius:8px; padding:6px; box-sizing:border-box;
+            display:flex; flex-direction:column; align-items:center; gap:5px;
+            border:1.5px solid; box-shadow:0 8px 28px rgba(0,0,0,.30);
+            transform:scale(1.06); transition:none; font-family:'Barlow Condensed',sans-serif;
+        }
+        .custom-card-name {
+            font-family:'Barlow Condensed',sans-serif; font-size:.75rem; font-weight:800;
+            color:var(--text); text-align:center; background:transparent;
+            border:none; outline:none; border-bottom:1.5px dashed transparent;
+            width:100%; cursor:text; transition:border-color .2s;
+        }
+        .custom-card-name:focus { border-bottom-color:#0055aa; }
+        /* Lamp-Zone: füllt den verbleibenden Platz → Lämpchen landen in der Mitte */
+        .custom-lamp-zone {
+            flex:1;
+            display:flex; justify-content:center; align-items:center;
+            touch-action:auto; cursor:default;
+            position:relative;
+        }
+        .custom-lamps { display:flex; gap:6px; justify-content:center; position:relative; }
+        /* Unsichtbarer Hit-Target über jedem Lämpchen: etwas größer aber nicht überlappend.
+           Lämpchen sind 12px, Gap 6px → Abstand zwischen Mittelpunkten = 18px.
+           Hit-Target: 18px (Durchmesser ≤ 18px damit kein Overlap) */
+        .lamp-hit {
+            position:absolute; top:50%; transform:translateY(-50%);
+            width:20px; height:20px; border-radius:50%;
+            background:transparent; cursor:pointer;
+            /* Verhindert Drag */
+            touch-action:auto;
+        }
+        .custom-card.state-r { background:#f5dada; border-color:#e0a0a0; }
+        .custom-card.state-y { background:#f8f0c8; border-color:#ccb040; }
+        .custom-card.state-g { background:#cceedc; border-color:#70b890; }
+        .custom-card-del {
+            position:absolute; top:2px; right:4px; font-size:.72rem; color:#a06060;
+            cursor:pointer; opacity:0; transition:opacity .15s; font-weight:900; line-height:1;
+        }
+        .custom-card:hover .custom-card-del { opacity:1; }
+        /* + Neue Karte */
+        .custom-add-btn {
+            position:absolute; bottom:10px; right:10px;
+            width:36px; height:36px; border-radius:50%;
+            background:#1a4a72; color:#fff; font-size:1.4rem; font-weight:300;
+            line-height:36px; text-align:center; cursor:pointer;
+            box-shadow:0 3px 10px rgba(0,0,0,.22); transition:background .15s,transform .1s;
+            user-select:none;
+        }
+        .custom-add-btn:hover  { background:#2a6a96; }
+        .custom-add-btn:active { transform:scale(.9); }
+        /* ++ Neue Sektion hinzufügen */
+        .add-section-btn {
+            display:flex; align-items:center; justify-content:center; gap:8px;
+            padding:10px 14px; border-radius:10px;
+            border:1.5px dashed #90b0c8; background:#d4e4ee;
+            cursor:pointer; transition:background .15s;
+            font-family:'Barlow Condensed',sans-serif; font-size:.9rem;
+            font-weight:700; color:#3a6080; letter-spacing:.06em; text-transform:uppercase;
+            user-select:none;
+        }
+        .add-section-btn:hover { background:#c4d4e0; }
+    </style>
+</head>
+<body>
+
+<header class="app-header">
+    <img src="data:image/png;base64,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" height="46" style="flex-shrink:0;object-fit:contain;margin-left:-14px;margin-right:2px;margin-top:10px;" alt="Springer"><div class="app-title">Turmspringen</div>
+    <div class="hpw">
+        <div class="hpt" id="progressText">Lade…</div>
+        <div class="pb-bg"><div class="pb-fill" id="progressBar" style="width:0%"></div></div>
+    </div>
+</header>
+
+<div class="app-body">
+    <nav class="height-sidebar" id="heightSidebar"></nav>
+    <main class="main-content" id="mainContent"></main>
+</div>
+
+<script>
+/* ================================================================
+   KONFIGURATION
+================================================================ */
+const HEIGHTS    = ['1m','3m','5m','7.5m','10m'];
+const DIRECTIONS = [
+    {name:'Vorwärts',  code:1},
+    {name:'Rückwärts', code:2},
+    {name:'Auerbach',  code:3},
+    {name:'Delfin',    code:4},
+    {name:'Handstand', code:6}
+];
+const EXECUTIONS  = ['a','b','c'];
+const LAMP_STATES = ['r','y','g'];
+const LAMP_CLS    = ['lamp-r','lamp-y','lamp-g'];
+const LAMP_NAMES  = ['gestreckt','gehechtet','gehockt'];
+
+const MAX_SALTI     = 9;    // bis 4.5 Salti
+const MAX_SCHRAUBEN = 9;    // bis 4.5 Schrauben (erweitert von 7 auf 9)
+
+const SUB_STYLE  = {r:{bg:'#f5dada',bd:'#e0a0a0'}, y:{bg:'#f8f0c8',bd:'#ccb040'}, g:{bg:'#cceedc',bd:'#70b890'}};
+const SUB_RGB    = {r:[245,218,218], y:[248,240,200], g:[204,238,220]};
+const SUB_BD_RGB = {r:[224,160,160], y:[204,176,64],  g:[112,184,144]};
+
+let activeHeight = '1m';
+
+/* ================================================================
+   HILFSFUNKTIONEN: Codes und Beschriftungen
+================================================================ */
+
+function makeCode(dc, s, w) {
+    return w === 0 ? `${dc}0${s}` : `5${dc}${s}${w}`;
+}
+
+// Halbe Salti als ausgeschriebenen Text (für vertikales Zeilen-Label)
+// 1→"½ Salto"  2→"1 Salto"  3→"1 ½ Salti"  4→"2 Salti" …
+function fmtSalti(n) {
+    const whole = Math.floor(n / 2);
+    const half  = n % 2 === 1;
+    const word  = (whole <= 1 && !half) || (whole === 0 && half) ? 'Salto' : 'Salti';
+    if (whole === 0) return '½ Salto';
+    if (!half)       return `${whole} ${word}`;
+    return `${whole} ½ ${word}`;
+}
+
+// Halbe Schrauben als lesbaren Text mit ausgeschriebenem "Schrauben"
+// 1→"½ Schrauben"  2→"1 Schraube"  3→"1 ½ Schrauben"  4→"2 Schrauben" …
+function fmtSchr(n) {
+    const whole = Math.floor(n / 2);
+    const half  = n % 2 === 1;
+    const word  = (whole === 1 && !half) ? 'Schraube' : 'Schrauben';
+    if (whole === 0) return '½ Schrauben';
+    if (!half)       return `${whole} ${word}`;
+    return `${whole} ½ ${word}`;
+}
+
+/* ================================================================
+   PERSISTENZ
+================================================================ */
+const lKey    = (h,d,c,e) => `${h}|${d}|${c}|${e}`;
+const getLamp = (h,d,c,e) => localStorage.getItem(lKey(h,d,c,e)) || 'r';
+const setLamp = (h,d,c,e,v) => localStorage.setItem(lKey(h,d,c,e), v);
+
+/* ================================================================
+   FREISCHALT-LOGIK
+================================================================ */
+
+// Ist ein einzelner Sub-Task spielbar (klickbar)?
+function isSpielbar(h, dirName, dirCode, salti, schrauben, exec) {
+    if (schrauben === 0) {
+        if (salti <= 2) return true;
+        return getLamp(h, dirName, makeCode(dirCode, salti - 1, 0), exec) === 'g';
+    }
+    const prevW = schrauben === 1 ? 0 : schrauben - 1;
+    return getLamp(h, dirName, makeCode(dirCode, salti, prevW), exec) === 'g';
+}
+
+// Ist ein Task (Aufgabe) mindestens sichtbar?
+function isTaskVisible(h, dirName, dirCode, salti, schrauben) {
+    if (schrauben === 0) {
+        if (salti <= 2) return true;
+        for (const e of EXECUTIONS)
+            if (isSpielbar(h, dirName, dirCode, salti - 1, 0, e)) return true;
+        return false;
+    }
+    if (schrauben === 1) {
+        if (salti <= 2) return true;
+        for (const e of EXECUTIONS)
+            if (isSpielbar(h, dirName, dirCode, salti, 0, e)) return true;
+        return false;
+    }
+    for (const e of EXECUTIONS)
+        if (isSpielbar(h, dirName, dirCode, salti, schrauben - 1, e)) return true;
+    return false;
+}
+
+// Kaskaden-Reset: alle nicht mehr spielbaren Sub-Tasks auf Rot
+function resetNonSpielbar(h) {
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const dir of DIRECTIONS)
+            for (let s = 1; s <= MAX_SALTI; s++)
+                for (let w = 0; w <= MAX_SCHRAUBEN; w++)
+                    for (const exec of EXECUTIONS)
+                        if (!isSpielbar(h, dir.name, dir.code, s, w, exec))
+                            if (getLamp(h, dir.name, makeCode(dir.code, s, w), exec) !== 'r') {
+                                setLamp(h, dir.name, makeCode(dir.code, s, w), exec, 'r');
+                                changed = true;
+                            }
+    }
+}
+
+/* ================================================================
+   STERNE-BEWERTUNG (0–10 Halb-Sterne = 0–5 volle Sterne)
+
+   Einfaches kumulatives System: zähle grüne Sub-Tasks dieser Richtung.
+   Pro Stern-Stufe braucht man N weitere grüne Sub-Tasks:
+
+     Stern ½  → Schwelle  1  (1 mehr als vorhin)
+     Stern 1  → Schwelle  2  (1 mehr)
+     Stern 1½ → Schwelle  4  (2 mehr)
+     Stern 2  → Schwelle  6  (2 mehr)
+     Stern 2½ → Schwelle  9  (3 mehr)
+     Stern 3  → Schwelle 12  (3 mehr)
+     Stern 3½ → Schwelle 16  (4 mehr)
+     Stern 4  → Schwelle 20  (4 mehr)
+     Stern 4½ → Schwelle 25  (5 mehr)
+     Stern 5  → Schwelle 30  (5 mehr)
+================================================================ */
+const STAR_THRESHOLDS = [1, 2, 4, 6, 9, 12, 16, 20, 25, 30];
+
+function calcStars(h, dir) {
+    // Zähle alle grünen Sub-Tasks dieser Richtung (nur spielbare zählen)
+    let greenCount = 0;
+    for (let s = 1; s <= MAX_SALTI; s++) {
+        for (let w = 0; w <= MAX_SCHRAUBEN; w++) {
+            const code = makeCode(dir.code, s, w);
+            for (const exec of EXECUTIONS) {
+                if (isSpielbar(h, dir.name, dir.code, s, w, exec) &&
+                    getLamp(h, dir.name, code, exec) === 'g') {
+                    greenCount++;
+                }
+            }
+        }
+    }
+    // Score = Anzahl überschrittener Schwellen (0–10)
+    return STAR_THRESHOLDS.filter(t => greenCount >= t).length;
+}
+
+/* ================================================================
+   STERNE HTML RENDERN
+   score: 0–10 Halbsterne → 5 Stern-Slots
+================================================================ */
+function starsHTML(score) {
+    let html = '';
+    for (let i = 0; i < 5; i++) {
+        // Wie viel ist dieser Stern-Slot gefüllt? (0, 50 oder 100 %)
+        const raw  = (score - i * 2) * 50;
+        const fill = Math.max(0, Math.min(100, raw));
+        html += `<span class="star-slot">★<span class="star-fill" style="width:${fill}%">★</span></span>`;
+    }
+    return html;
+}
+
+/* ================================================================
+   FORTSCHRITT (globaler Header-Balken)
+================================================================ */
+function calcTotal() {
+    let total = 0, mastered = 0;
+    HEIGHTS.forEach(h => DIRECTIONS.forEach(dir => {
+        for (let s = 1; s <= MAX_SALTI; s++)
+            for (let w = 0; w <= MAX_SCHRAUBEN; w++)
+                EXECUTIONS.forEach(exec => {
+                    if (isSpielbar(h, dir.name, dir.code, s, w, exec)) {
+                        total++;
+                        if (getLamp(h, dir.name, makeCode(dir.code, s, w), exec) === 'g') mastered++;
+                    }
+                });
+    }));
+    return {total, mastered};
+}
+
+function heightHasProgress(h) {
+    for (const dir of DIRECTIONS)
+        for (let s = 1; s <= MAX_SALTI; s++)
+            for (let w = 0; w <= MAX_SCHRAUBEN; w++)
+                for (const exec of EXECUTIONS)
+                    if (isSpielbar(h, dir.name, dir.code, s, w, exec) &&
+                        getLamp(h, dir.name, makeCode(dir.code, s, w), exec) !== 'r')
+                        return true;
+    return false;
+}
+
+function updateProgress() {
+    const {total, mastered} = calcTotal();
+    const pct = total > 0 ? Math.round(mastered / total * 100) : 0;
+    document.getElementById('progressText').textContent =
+        `✅ ${mastered} / ${total} gemeistert (${pct}%)`;
+    document.getElementById('progressBar').style.width = `${pct}%`;
+}
+
+/* ================================================================
+   SEITENLEISTE
+================================================================ */
+/* ================================================================
+   HÖHEN-REIHENFOLGE: alle Tabs (fix + custom) sortierbar
+   Gespeichert: "heightOrder" → ["1m","3m","5m","7.5m","10m","ch_xxx",…]
+   Default: HEIGHTS-Reihenfolge + custom heights hinten
+================================================================ */
+const HEIGHT_ORDER_KEY = 'heightOrder';
+
+function loadHeightOrder() {
+    const saved = JSON.parse(localStorage.getItem(HEIGHT_ORDER_KEY) || 'null');
+    const customIds = loadCustomHeights().map(h => h.id);
+    if (!saved) return [...HEIGHTS, ...customIds];
+    // Neu hinzugekommene IDs ans Ende, entfernte rausfiltern
+    const allIds = [...HEIGHTS, ...customIds];
+    const filtered = saved.filter(id => allIds.includes(id));
+    const missing  = allIds.filter(id => !filtered.includes(id));
+    return [...filtered, ...missing];
+}
+
+function saveHeightOrder(order) {
+    localStorage.setItem(HEIGHT_ORDER_KEY, JSON.stringify(order));
+}
+
+/* ================================================================
+   EIGENE HÖHEN: dynamisch erstellbare Höhen-Tabs
+   Gespeichert als Array: "customHeights" → [{id, label}]
+   Eigene Höhen zeigen NUR eigene Sektionen (keine DIRECTIONS).
+================================================================ */
+const CUSTOM_HEIGHTS_KEY = 'customHeights';
+
+function loadCustomHeights() {
+    try { return JSON.parse(localStorage.getItem(CUSTOM_HEIGHTS_KEY)) || []; }
+    catch { return []; }
+}
+function saveCustomHeights(hs) { localStorage.setItem(CUSTOM_HEIGHTS_KEY, JSON.stringify(hs)); }
+
+// Prüft ob aktive Höhe eine eigene (custom) Höhe ist
+function isCustomHeight(h) {
+    return loadCustomHeights().some(x => x.id === h);
+}
+
+function addCustomHeight() {
+    const hs = loadCustomHeights();
+    const id = 'ch_' + Date.now();
+    hs.push({ id, label: '?' });
+    saveCustomHeights(hs);
+    // Neue Höhe ans Ende der Reihenfolge
+    const order = loadHeightOrder();
+    if (!order.includes(id)) order.push(id);
+    saveHeightOrder(order);
+    activeHeight = id;
+    render();
+    // Kleiner Delay damit das Input-Element schon im DOM ist
+    setTimeout(() => {
+        const inp = document.querySelector(`.height-tab[data-hid="${id}"] .height-tab-input`);
+        if (inp) { inp.select(); inp.focus(); }
+    }, 80);
+}
+
+function deleteCustomHeight(id) {
+    const hs    = loadCustomHeights().filter(h => h.id !== id);
+    saveCustomHeights(hs);
+    // Reihenfolge bereinigen
+    const order = loadHeightOrder().filter(x => x !== id);
+    saveHeightOrder(order);
+    if (activeHeight === id) activeHeight = '1m';
+    render();
+}
+
+function renameCustomHeight(id, label) {
+    const hs = loadCustomHeights();
+    const h  = hs.find(x => x.id === id);
+    if (h) { h.label = label; saveCustomHeights(hs); }
+}
+
+/* ── Sidebar-Drag-State ──────────────────────────────────────── */
+let _sbDrag = null; // { id, label, ghost, startY, overId }
+
+function _sbDragStart(id, label, clientY) {
+    // Ghost erzeugen
+    const ghost = document.createElement('div');
+    ghost.id = 'heightDragGhost';
+    ghost.textContent = label;
+    ghost.style.top = clientY - 23 + 'px';
+    document.body.appendChild(ghost);
+    _sbDrag = { id, label, ghost, overId: null };
+}
+
+function _sbDragMove(clientY) {
+    if (!_sbDrag) return;
+    _sbDrag.ghost.style.top = (clientY - 23) + 'px';
+    _sbDrag.ghost.style.visibility = 'hidden';
+    const el = document.elementFromPoint(4, clientY);
+    _sbDrag.ghost.style.visibility = '';
+    document.querySelectorAll('.height-tab.drag-over-top,.height-tab.drag-over-bot')
+        .forEach(t => { t.classList.remove('drag-over-top','drag-over-bot'); });
+    const tab = el?.closest('.height-tab');
+    if (tab && tab.dataset.orderid && tab.dataset.orderid !== _sbDrag.id) {
+        const rect   = tab.getBoundingClientRect();
+        const before = clientY < rect.top + rect.height / 2;
+        tab.classList.add(before ? 'drag-over-top' : 'drag-over-bot');
+        _sbDrag.overId    = tab.dataset.orderid;
+        _sbDrag.overBefore = before;
+    } else {
+        _sbDrag.overId = null;
+    }
+}
+
+function _sbDragEnd() {
+    if (!_sbDrag) return;
+    _sbDrag.ghost.remove();
+    document.querySelectorAll('.height-tab.drag-over-tab')
+        .forEach(t => t.classList.remove('drag-over-tab'));
+    const { id, overId, overBefore } = _sbDrag;
+    _sbDrag = null;
+    if (!overId || overId === id) return;
+    // INSERT: Reiter aus aktueller Position entfernen und vor/nach Ziel einfügen
+    const order = loadHeightOrder();
+    const from  = order.indexOf(id);
+    if (from < 0) return;
+    order.splice(from, 1);                      // herausnehmen
+    let to = order.indexOf(overId);
+    if (to < 0) return;
+    if (!overBefore) to++;                      // nach dem Ziel einfügen
+    order.splice(to, 0, id);                    // einfügen
+    saveHeightOrder(order);
+    renderSidebar();
+}
+
+// Globale Pointer-Listener für Sidebar-Drag
+window.addEventListener('pointermove', e => { if (_sbDrag) _sbDragMove(e.clientY); });
+window.addEventListener('pointerup',   () => { if (_sbDrag) _sbDragEnd(); });
+
+function renderSidebar() {
+    const sb       = document.getElementById('heightSidebar');
+    sb.innerHTML   = '';
+    const customHs = loadCustomHeights();
+    const chMap    = new Map(customHs.map(h => [h.id, h]));
+    const order    = loadHeightOrder();
+
+    order.forEach(hid => {
+        const isFixed  = HEIGHTS.includes(hid);
+        const ch       = chMap.get(hid);
+        if (!isFixed && !ch) return; // veraltete ID
+
+        const label = isFixed ? hid : ch.label;
+        const tab   = document.createElement('div');
+        tab.className      = 'height-tab' + (hid === activeHeight ? ' active' : '');
+        tab.dataset.orderid = hid;
+        if (ch) tab.dataset.hid = hid;
+
+        if (isFixed) {
+            const lbl = document.createElement('span');
+            lbl.textContent = label;
+            tab.appendChild(lbl);
+            const dot = document.createElement('div');
+            dot.className = 'h-dot' + (heightHasProgress(hid) ? ' on' : '');
+            tab.appendChild(dot);
+        } else {
+            // Editierbares Label
+            const inp = document.createElement('input');
+            inp.className = 'height-tab-input';
+            inp.type = 'text'; inp.value = ch.label; inp.maxLength = 6;
+            inp.addEventListener('focus', () => inp.select());
+            inp.addEventListener('change', () => renameCustomHeight(ch.id, inp.value));
+            inp.addEventListener('pointerdown', e => e.stopPropagation());
+            tab.appendChild(inp);
+            const dot = document.createElement('div');
+            dot.className = 'h-dot';
+            tab.appendChild(dot);
+            // Löschen-X
+            const del = document.createElement('div');
+            del.className = 'height-tab-del';
+            del.textContent = '✕';
+            del.addEventListener('pointerdown', e => e.stopPropagation());
+            del.addEventListener('click', e => { e.stopPropagation(); deleteCustomHeight(ch.id); });
+            tab.appendChild(del);
+        }
+
+        // Klick → Höhe aktivieren
+        tab.addEventListener('click', () => { activeHeight = hid; render(); });
+
+        // Drag → Reihenfolge ändern
+        tab.addEventListener('pointerdown', e => {
+            if (e.target.closest('.height-tab-input,.height-tab-del')) return;
+            e.preventDefault();
+            tab.setPointerCapture(e.pointerId);
+            _sbDragStart(hid, label, e.clientY);
+        });
+
+        sb.appendChild(tab);
+    });
+
+    // Trennlinie vor dem Plus-Button
+    const divEl = document.createElement('div');
+    divEl.className = 'height-divider';
+    sb.appendChild(divEl);
+
+    // ＋ Neue Höhe
+    const addTab = document.createElement('div');
+    addTab.className   = 'height-add-tab';
+    addTab.textContent = '＋';
+    addTab.title       = 'Neue Höhe erstellen';
+    addTab.addEventListener('click', addCustomHeight);
+    sb.appendChild(addTab);
+}
+
+/* ================================================================
+   FARBMISCHUNG FÜR AUFGABEN-HINTERGRUND
+================================================================ */
+function blendStates(states) {
+    if (!states.length) return {bg:'#b8c8d4', bd:'#88a0b0'};
+    const n = states.length;
+    const bg = [0,1,2].map(ch => Math.round(states.reduce((a,st) => a + SUB_RGB[st][ch], 0) / n));
+    const bd = [0,1,2].map(ch => Math.round(states.reduce((a,st) => a + SUB_BD_RGB[st][ch], 0) / n));
+    return {bg:`rgb(${bg})`, bd:`rgb(${bd})`};
+}
+
+/* ================================================================
+   AUFGABEN-ZELLE ERSTELLEN
+================================================================ */
+function createCell(dirName, dirCode, salti, schrauben) {
+    const h    = activeHeight;
+    const code = makeCode(dirCode, salti, schrauben);
+
+    // Zustand jedes Sub-Tasks bestimmen
+    const subStates = EXECUTIONS.map(exec => {
+        if (isSpielbar(h, dirName, dirCode, salti, schrauben, exec)) return 'spielbar';
+        if (isTaskVisible(h, dirName, dirCode, salti, schrauben))    return 'sichtbar';
+        return 'hidden';
+    });
+
+    // Komplett unsichtbar → Platzhalter
+    if (subStates.every(s => s === 'hidden')) {
+        const ph = document.createElement('div');
+        ph.className = 'jump-cell cell-hidden';
+        return ph;
+    }
+
+    const lampStates  = EXECUTIONS.map(exec => getLamp(h, dirName, code, exec));
+    const anySpielbar = subStates.some(s => s === 'spielbar');
+
+    const cell = document.createElement('div');
+    cell.className = 'jump-cell ' + (anySpielbar ? 'cell-spielbar' : 'cell-sichtbar');
+
+    // Hintergrundfarbe aus spielbaren Sub-Tasks mischen
+    if (anySpielbar) {
+        const {bg, bd} = blendStates(lampStates.filter((_,i) => subStates[i] === 'spielbar'));
+        cell.style.background  = bg;
+        cell.style.borderColor = bd;
+    }
+
+    // Aufgaben-Code
+    const codeEl = document.createElement('div');
+    codeEl.className = 'cell-code';
+    codeEl.textContent = code;
+    cell.appendChild(codeEl);
+
+    // 3 Unteraufgaben in Reihenfolge c (oben), b (mitte), a (unten)
+    // c = leichter (gehockt), b = mittel (gehechtet), a = schwerer (gestreckt)
+    const DISPLAY_ORDER = ['c', 'b', 'a'];
+    DISPLAY_ORDER.forEach((exec) => {
+        const i     = EXECUTIONS.indexOf(exec);   // 0=a,1=b,2=c → Index für subStates/lampStates
+        const state   = subStates[i];
+        let   curLamp = lampStates[i];
+
+        const sub = document.createElement('div');
+        sub.className = 'sub-task' + (state === 'sichtbar' ? ' sub-sichtbar' : '');
+        if (state === 'spielbar') {
+            sub.style.background  = SUB_STYLE[curLamp].bg;
+            sub.style.borderColor = SUB_STYLE[curLamp].bd;
+        }
+
+        const lbl = document.createElement('div');
+        lbl.className = 'sub-label';
+        lbl.textContent = code + exec;
+        sub.appendChild(lbl);
+
+        const lampRow = document.createElement('div');
+        lampRow.className = 'sub-lamps';
+
+        const lamps = LAMP_STATES.map((ls, li) => {
+            const lamp = document.createElement('div');
+            lamp.className = `lamp ${LAMP_CLS[li]}`
+                + (ls === curLamp && state === 'spielbar' ? ' lit' : '');
+            lamp.title = `${code}${exec} – ${LAMP_NAMES[li]}`;
+            lamp.style.position = 'relative'; // für unsichtbaren Hit-Target
+            // Unsichtbarer Hit-Target: 22px, zentriert über dem 12px-Lämpchen
+            const hit = document.createElement('div');
+            hit.style.cssText = 'position:absolute;top:50%;left:50%;width:22px;height:22px;' +
+                'border-radius:50%;transform:translate(-50%,-50%);background:transparent;cursor:pointer;';
+            lamp.appendChild(hit);
+            lampRow.appendChild(lamp);
+            return lamp;
+        });
+
+        sub.appendChild(lampRow);
+        cell.appendChild(sub);
+
+        if (state === 'spielbar') {
+            lamps.forEach((lamp, li) => {
+                lamp.addEventListener('click', () => {
+                    const newLamp = LAMP_STATES[li];
+                    if (newLamp === curLamp) return;
+                    setLamp(h, dirName, code, exec, newLamp);
+                    resetNonSpielbar(h);
+                    render();
+                });
+            });
+        }
+    });
+
+    return cell;
+}
+
+/* ================================================================
+   SPRUNG-GITTER für eine Richtung (9 Schrauben-Spalten)
+================================================================ */
+function createGrid(dir) {
+    const h    = activeHeight;
+    const grid = document.createElement('div');
+    grid.className = 'jump-grid';
+    const empty = () => document.createElement('div');
+
+    // Zeile 0: Gruppen-Header
+    grid.appendChild(empty());
+    grid.appendChild(Object.assign(document.createElement('div'),
+        {className:'gh gh-ohne', textContent:'ohne Schraube'}));
+
+    // Trenner (rowspan 2)
+    const divH = document.createElement('div');
+    divH.style.cssText = 'grid-row:span 2;display:flex;justify-content:center;align-items:stretch;';
+    divH.innerHTML = '<div style="width:2px;background:var(--border);border-radius:1px;height:100%;margin:0 auto;"></div>';
+    grid.appendChild(divH);
+
+    grid.appendChild(Object.assign(document.createElement('div'),
+        {className:'gh gh-mit', textContent:'mit Schraube'}));
+
+    // Zeile 1: Spalten-Header
+    grid.appendChild(empty());
+    grid.appendChild(Object.assign(document.createElement('div'),
+        {className:'ch ch-ohne', textContent:'0 Schrauben'}));
+    for (let w = 1; w <= MAX_SCHRAUBEN; w++) {
+        grid.appendChild(Object.assign(document.createElement('div'),
+            {className:'ch ch-mit', textContent: fmtSchr(w)}));
+    }
+
+    // Daten-Zeilen
+    for (let s = 1; s <= MAX_SALTI; s++) {
+        const rowVisible = isTaskVisible(h, dir.name, dir.code, s, 0)
+            || Array.from({length: MAX_SCHRAUBEN}, (_, i) => i + 1)
+               .some(w => isTaskVisible(h, dir.name, dir.code, s, w));
+
+        const rl = document.createElement('div');
+        rl.className = 'row-label';
+        if (!rowVisible) rl.style.visibility = 'hidden';
+        rl.innerHTML = `<span class="row-label-inner">${fmtSalti(s)}</span>`;
+        grid.appendChild(rl);
+
+        grid.appendChild(createCell(dir.name, dir.code, s, 0));
+
+        const dc = document.createElement('div');
+        dc.className = 'div-cell';
+        dc.innerHTML = '<div class="div-inner"></div>';
+        grid.appendChild(dc);
+
+        for (let w = 1; w <= MAX_SCHRAUBEN; w++) {
+            grid.appendChild(createCell(dir.name, dir.code, s, w));
+        }
+    }
+
+    return grid;
+}
+
+/* ================================================================
+   RICHTUNGS-SEKTION mit Sterne-Bewertung
+================================================================ */
+function createSection(dir) {
+    const colKey      = `col|${dir.name}`;
+    const isCollapsed = localStorage.getItem(colKey) === '1';
+    const starScore   = calcStars(activeHeight, dir); // 0–10
+
+    const section = document.createElement('div');
+    section.className = 'dir-section' + (isCollapsed ? ' collapsed' : '');
+
+    // Heading mit Sterne-Anzeige
+    const heading = document.createElement('div');
+    heading.className = 'dir-heading';
+
+    // Links: Name der Richtung
+    const left = document.createElement('div');
+    left.className = 'h-left';
+    left.appendChild(Object.assign(document.createElement('span'), {textContent: dir.name}));
+
+    // Sterne-Anzeige
+    const starsEl = document.createElement('div');
+    starsEl.className = 'stars-wrap';
+    starsEl.innerHTML = starsHTML(starScore);
+    starsEl.id = `stars-${dir.name}`;
+    left.appendChild(starsEl);
+    heading.appendChild(left);
+
+    // Pfeil rechts
+    const arrow = document.createElement('span');
+    arrow.className = 'toggle-arrow';
+    arrow.textContent = '▼';
+    heading.appendChild(arrow);
+
+    heading.addEventListener('click', () => {
+        const now = section.classList.toggle('collapsed');
+        localStorage.setItem(colKey, now ? '1' : '0');
+    });
+
+    section.appendChild(heading);
+
+    // Einklappbarer Body mit Legende + Gitter
+    const body = document.createElement('div');
+    body.className = 'dir-body';
+
+    // Legende Farben
+    const legend = document.createElement('div');
+    legend.className = 'legend';
+    legend.innerHTML = `
+        <span class="legend-item"><span class="legend-dot" style="background:#f5dada;border:1px solid #e0a0a0"></span>Kann ich gar nicht</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#f8f0c8;border:1px solid #ccb040"></span>Schon mal probiert</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#cceedc;border:1px solid #70b890"></span>Kann ich gut</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#b8c8d4;border:1px solid #88a0b0;opacity:.65"></span>Noch gesperrt</span>
+    `;
+    body.appendChild(legend);
+
+    const scroll = document.createElement('div');
+    scroll.className = 'grid-scroll';
+    scroll.appendChild(createGrid(dir));
+    body.appendChild(scroll);
+
+    section.appendChild(body);
+    return section;
+}
+
+/* ================================================================
+   HAUPT-RENDER
+================================================================ */
+function render() {
+    renderSidebar();
+    updateProgress();
+    const main = document.getElementById('mainContent');
+    main.innerHTML = '';
+    if (isCustomHeight(activeHeight)) {
+        // Eigene Höhe: nur eigene Sektionen anzeigen (keine vorinstallierten Richtungen)
+        renderAllCustom();
+    } else {
+        // Vorinstallierte Höhe: Richtungen + eigene Sektionen
+        DIRECTIONS.forEach(dir => main.appendChild(createSection(dir)));
+        renderAllCustom();
+    }
+}
+
+/* ================================================================
+   EIGENE SPRÜNGE – Custom-Sektion
+   Datenspeicherung:
+     "custom|title"            → Titel der Sektion (String)
+     "custom|cards"            → JSON-Array der Karten
+       [{id, name, lamp, pos}]
+         id:   eindeutige ID
+         name: Anzeigename
+         lamp: 'r'|'y'|'g'
+         pos:  Integer (Reihenfolge)
+================================================================ */
+
+/* ================================================================
+   EIGENE SPRÜNGE – Mehrere Custom-Sektionen
+   Gespeichert als Array in localStorage:
+     "customSections" → [{id, title, collapsed, cards:[{id,name,lamp,pos}]}]
+================================================================ */
+
+// Custom-Daten pro Höhe gespeichert: 'customSections|1m', 'customSections|3m', usw.
+const customSecsKey = () => `customSections|${activeHeight}`;
+
+function loadSections() {
+    try { return JSON.parse(localStorage.getItem(customSecsKey())) || []; }
+    catch { return []; }
+}
+function saveSections(secs) { localStorage.setItem(customSecsKey(), JSON.stringify(secs)); }
+
+/* Neue Sektion anlegen */
+function addSection() {
+    const secs = loadSections();
+    secs.push({ id: Date.now().toString(), title: 'Eigene Sprünge', collapsed: false, cards: [] });
+    saveSections(secs);
+    renderAllCustom();
+}
+
+/* Sektion löschen */
+function deleteSection(secId) {
+    saveSections(loadSections().filter(s => s.id !== secId));
+    renderAllCustom();
+}
+
+/* Karte hinzufügen */
+function addCard(secId) {
+    const secs = loadSections();
+    const sec  = secs.find(s => s.id === secId);
+    if (!sec) return;
+    const used = new Set(sec.cards.map(c => c.pos));
+    let p = 0; while (used.has(p)) p++;
+    sec.cards.push({ id: Date.now().toString(), name: 'Eigener Sprung', lamp: 'r', pos: p });
+    saveSections(secs);
+    renderAllCustom();
+}
+
+/* Karte löschen */
+function deleteCard(secId, cardId) {
+    const secs = loadSections();
+    const sec  = secs.find(s => s.id === secId);
+    if (!sec) return;
+    sec.cards = sec.cards.filter(c => c.id !== cardId);
+    saveSections(secs);
+    renderAllCustom();
+}
+
+/* Karte Lamp setzen */
+function setCardLamp(secId, cardId, lamp) {
+    const secs = loadSections();
+    const sec  = secs.find(s => s.id === secId);
+    if (!sec) return;
+    const card = sec.cards.find(c => c.id === cardId);
+    if (card) { card.lamp = lamp; saveSections(secs); }
+}
+
+/* Karte umbenennen */
+function renameCard(secId, cardId, name) {
+    const secs = loadSections();
+    const sec  = secs.find(s => s.id === secId);
+    if (!sec) return;
+    const card = sec.cards.find(c => c.id === cardId);
+    if (card) { card.name = name; saveSections(secs); }
+}
+
+/* Karten-Positionen tauschen */
+function swapCards(secId, cardId, targetPos) {
+    const secs = loadSections();
+    const sec  = secs.find(s => s.id === secId);
+    if (!sec) return;
+    const mover   = sec.cards.find(c => c.id === cardId);
+    if (!mover) return;
+    const swapper = sec.cards.find(c => c.pos === targetPos && c.id !== cardId);
+    if (swapper) swapper.pos = mover.pos;
+    mover.pos = targetPos;
+    saveSections(secs);
+    renderAllCustom();
+}
+
+/* ================================================================
+   DRAG & DROP – echter Pointer-Event-Drag, kein zweiter Klick
+================================================================ */
+let _drag = null; // { secId, cardId, origPos, clone, offX, offY }
+
+function dragCloneEl() { return document.getElementById('dragClone'); }
+
+function startDrag(secId, cardId, cardEl, clientX, clientY) {
+    const rect  = cardEl.getBoundingClientRect();
+    // Klon als fixiertes floating Element
+    const clone = document.createElement('div');
+    clone.id = 'dragClone';
+    clone.style.cssText = `left:${rect.left}px;top:${rect.top}px;
+        width:${rect.width}px;background:${getComputedStyle(cardEl).background};
+        border-color:${getComputedStyle(cardEl).borderColor};`;
+    clone.innerHTML = cardEl.innerHTML;
+    document.body.appendChild(clone);
+
+    cardEl.classList.add('dragging');
+    // Nur während Drag: Scrollen der Seite sperren
+    document.getElementById('mainContent')?.classList.add('custom-drag-active');
+    _drag = {
+        secId, cardId,
+        origPos: parseInt(cardEl.dataset.pos),
+        el: cardEl,
+        offX: clientX - rect.left,
+        offY: clientY - rect.top,
+        overSlot: null
+    };
+}
+
+function moveDrag(clientX, clientY) {
+    if (!_drag) return;
+    const clone = dragCloneEl();
+    if (clone) {
+        clone.style.left = (clientX - _drag.offX) + 'px';
+        clone.style.top  = (clientY - _drag.offY) + 'px';
+    }
+    // Highlight Ziel-Slot
+    if (clone) clone.style.visibility = 'hidden';
+    const underEl = document.elementFromPoint(clientX, clientY);
+    if (clone) clone.style.visibility = '';
+
+    document.querySelectorAll('.custom-slot.drag-over,.custom-card.drag-target')
+        .forEach(e => e.classList.remove('drag-over','drag-target'));
+
+    const slot = underEl?.closest('.custom-slot');
+    const card = underEl?.closest('.custom-card:not(.dragging)');
+    if (slot && slot.closest('[data-secid="'+_drag.secId+'"]')) {
+        slot.classList.add('drag-over');
+        _drag.overSlot = parseInt(slot.dataset.pos);
+    } else if (card && card.closest('[data-secid="'+_drag.secId+'"]')) {
+        card.classList.add('drag-target');
+        _drag.overSlot = parseInt(card.dataset.pos);
+    } else {
+        _drag.overSlot = null;
+    }
+}
+
+function endDrag() {
+    if (!_drag) return;
+    const clone = dragCloneEl();
+    if (clone) clone.remove();
+    document.querySelectorAll('.custom-slot.drag-over,.custom-card.drag-target')
+        .forEach(e => e.classList.remove('drag-over','drag-target'));
+
+    const { secId, cardId, overSlot, el } = _drag;
+    el.classList.remove('dragging');
+    document.getElementById('mainContent')?.classList.remove('custom-drag-active');
+    _drag = null;
+
+    if (overSlot !== null && overSlot !== undefined) {
+        swapCards(secId, cardId, overSlot);  // re-renders
+    }
+}
+
+/* Globale Listener (einmalig).
+   Drag startet erst nach DRAG_THRESH px Bewegung →
+   kurze Taps werden nie als Drag erkannt → Lämpchen klickbar. */
+const DRAG_THRESH = 6;
+let _pending = null; // { secId, cardId, el, startX, startY }
+
+window.addEventListener('pointermove', e => {
+    // Pending: noch nicht als Drag gestartet
+    if (_pending && !_drag) {
+        const dx = e.clientX - _pending.startX;
+        const dy = e.clientY - _pending.startY;
+        if (Math.sqrt(dx*dx + dy*dy) >= DRAG_THRESH) {
+            startDrag(_pending.secId, _pending.cardId, _pending.el, e.clientX, e.clientY);
+            _pending = null;
+        }
+    }
+    if (_drag) { e.preventDefault(); moveDrag(e.clientX, e.clientY); }
+}, {passive:false});
+
+window.addEventListener('pointerup', e => {
+    _pending = null;   // War nur ein Tap → kein Drag
+    if (_drag) endDrag();
+});
+window.addEventListener('pointercancel', () => { _pending = null; if (_drag) endDrag(); });
+
+/* ================================================================
+   KARTE ALS DOM-ELEMENT
+================================================================ */
+function createCardEl(secId, card) {
+    const el = document.createElement('div');
+    el.className = `custom-card state-${card.lamp}`;
+    el.dataset.pos   = card.pos;
+    el.dataset.card  = card.id;
+
+    // Löschen-Button ✕ – zeigt sich beim Hover
+    const del = document.createElement('div');
+    del.className   = 'custom-card-del';
+    del.textContent = '✕';
+    del.addEventListener('pointerdown', e => e.stopPropagation());
+    del.addEventListener('pointerup', e => {
+        e.stopPropagation();
+        deleteCard(secId, card.id);
+    });
+    el.appendChild(del);
+
+    // Name (editierbar, alles markieren bei Fokus)
+    const nameEl = document.createElement('input');
+    nameEl.className = 'custom-card-name';
+    nameEl.type = 'text'; nameEl.value = card.name; nameEl.maxLength = 20;
+    nameEl.addEventListener('focus', () => nameEl.select());
+    nameEl.addEventListener('change', () => renameCard(secId, card.id, nameEl.value));
+    nameEl.addEventListener('pointerdown', e => e.stopPropagation());
+    el.appendChild(nameEl);
+
+    // 3 Lämpchen – pointerdown stoppt Propagation damit kein Drag startet
+    const lampRow = document.createElement('div');
+    lampRow.className = 'custom-lamps';
+    const lampClasses = ['lamp-r','lamp-y','lamp-g'];
+    const lampStates  = ['r','y','g'];
+    const lampTitles  = ['Kann ich gar nicht','Schon mal probiert','Kann ich gut'];
+
+    lampStates.forEach((ls, li) => {
+        const lamp = document.createElement('div');
+        lamp.className = `lamp ${lampClasses[li]}` + (ls === card.lamp ? ' lit' : '');
+        lamp.title = lampTitles[li];
+        lamp.style.position = 'relative'; // für den hit-target
+        lamp.addEventListener('pointerdown', e => e.stopPropagation());
+
+        // Unsichtbarer Hit-Target: 20px gross, zentriert über der 12px-Lampe
+        // Damit man auch knapp neben das Lämpchen tippen kann
+        const hit = document.createElement('div');
+        hit.style.cssText = 'position:absolute;top:50%;left:50%;width:22px;height:22px;' +
+            'border-radius:50%;transform:translate(-50%,-50%);background:transparent;' +
+            'cursor:pointer;touch-action:auto;';
+        hit.addEventListener('pointerdown', e => e.stopPropagation());
+        hit.addEventListener('pointerup', e => {
+            e.stopPropagation();
+            if (ls === card.lamp) return;
+            card.lamp = ls;
+            setCardLamp(secId, card.id, ls);
+            el.className = `custom-card state-${ls}`;
+            el.dataset.pos  = card.pos;
+            el.dataset.card = card.id;
+            lampRow.querySelectorAll('.lamp').forEach((l,j) => l.classList.toggle('lit', j===li));
+        });
+        lamp.appendChild(hit);
+        lampRow.appendChild(lamp);
+    });
+    // Lamp-Zone: abgesetzter klickbarer Bereich – kein Drag möglich innerhalb
+    const lampZone = document.createElement('div');
+    lampZone.className = 'custom-lamp-zone';
+    lampZone.addEventListener('pointerdown', e => e.stopPropagation());
+    lampZone.appendChild(lampRow);
+    el.appendChild(lampZone);
+
+    /* Drag starten */
+    el.addEventListener('pointerdown', e => {
+        if (e.target.closest('.custom-card-name, .custom-card-del, .custom-lamp-zone')) return;
+        // Kein preventDefault hier – damit click-Events auf Kinder weiter funktionieren
+        _pending = { secId, cardId: card.id, el, startX: e.clientX, startY: e.clientY };
+    });
+
+    return el;
+}
+
+/* ================================================================
+   EINE CUSTOM-SEKTION RENDERN
+================================================================ */
+const CUSTOM_COLS = 5;
+
+/* ── Sektions-Drag-State ───────────────────────────────────────── */
+let _secDrag = null; // { secId, ghost, overSecId }
+
+function _secDragStart(secId, headingEl, clientX, clientY) {
+    const rect  = headingEl.getBoundingClientRect();
+    const ghost = headingEl.cloneNode(true);
+    ghost.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;
+        width:${rect.width}px;z-index:9999;opacity:.85;pointer-events:none;
+        box-shadow:0 4px 16px rgba(0,0,0,.3);border-radius:8px;`;
+    document.body.appendChild(ghost);
+    _secDrag = { secId, ghost, overSecId: null,
+                 offX: clientX - rect.left, offY: clientY - rect.top };
+}
+
+function _secDragMove(clientX, clientY) {
+    if (!_secDrag) return;
+    _secDrag.ghost.style.left = (clientX - _secDrag.offX) + 'px';
+    _secDrag.ghost.style.top  = (clientY - _secDrag.offY) + 'px';
+
+    // Bestimme Einfügeposition rein anhand der Y-Koordinate –
+    // unabhängig davon, ob die Maus direkt über einem Reiter liegt.
+    document.querySelectorAll('.custom-section.sec-drag-over-top,.custom-section.sec-drag-over-bot')
+        .forEach(s => { s.classList.remove('sec-drag-over-top','sec-drag-over-bot'); });
+
+    // Alle Sektionen (ausser der gezogenen) sammeln
+    const all = [...document.querySelectorAll('.custom-section[data-secid]')]
+        .filter(s => s.dataset.secid !== _secDrag.secId);
+
+    if (!all.length) { _secDrag.overSecId = null; return; }
+
+    // Finde nächsten Reiter anhand des Abstands der Maus zur Mitte jeder Sektion
+    let best = null, bestDist = Infinity;
+    all.forEach(s => {
+        const r    = s.getBoundingClientRect();
+        const mid  = r.top + r.height / 2;
+        const dist = Math.abs(clientY - mid);
+        if (dist < bestDist) { bestDist = dist; best = s; }
+    });
+
+    if (best) {
+        const r      = best.getBoundingClientRect();
+        const before = clientY < r.top + r.height / 2;
+        best.classList.add(before ? 'sec-drag-over-top' : 'sec-drag-over-bot');
+        _secDrag.overSecId  = best.dataset.secid;
+        _secDrag.overBefore = before;
+    } else {
+        _secDrag.overSecId = null;
+    }
+}
+
+function _secDragEnd() {
+    if (!_secDrag) return;
+    _secDrag.ghost.remove();
+    document.querySelectorAll('.custom-section.sec-drag-over-top,.custom-section.sec-drag-over-bot')
+        .forEach(s => { s.classList.remove('sec-drag-over-top','sec-drag-over-bot'); });
+    const { secId, overSecId, overBefore } = _secDrag;
+    _secDrag = null;
+    if (!overSecId) return;
+    // INSERT: Sektion herausnehmen und vor/nach Ziel einfügen
+    const secs = loadSections();
+    const from = secs.findIndex(s => s.id === secId);
+    if (from < 0) return;
+    const [moved] = secs.splice(from, 1);
+    let to = secs.findIndex(s => s.id === overSecId);
+    if (to < 0) return;
+    if (!overBefore) to++;
+    secs.splice(to, 0, moved);
+    saveSections(secs);
+    renderAllCustom();
+}
+
+// Globale Listener für Sektions-Drag
+window.addEventListener('pointermove', e => { if (_secDrag) { e.preventDefault(); _secDragMove(e.clientX, e.clientY); } }, {passive:false});
+window.addEventListener('pointerup',   () => { if (_secDrag) _secDragEnd(); });
+
+function renderOneSection(sec) {
+    const section = document.createElement('div');
+    section.className = 'custom-section' + (sec.collapsed ? ' collapsed' : '');
+    section.dataset.secid = sec.id;
+
+    // HEADING
+    const heading = document.createElement('div');
+    heading.className = 'custom-heading';
+
+    const titleInput = document.createElement('input');
+    titleInput.className = 'custom-title-input';
+    titleInput.type = 'text'; titleInput.value = sec.title; titleInput.maxLength = 30;
+    titleInput.addEventListener('focus', () => titleInput.select());
+    titleInput.addEventListener('change', () => {
+        const secs = loadSections();
+        const s = secs.find(x => x.id === sec.id);
+        if (s) { s.title = titleInput.value; saveSections(secs); }
+    });
+    titleInput.addEventListener('pointerdown', e => e.stopPropagation());
+    heading.appendChild(titleInput);
+
+    const right = document.createElement('div');
+    right.className = 'custom-heading-right';
+
+    // Sektion löschen
+    const delSec = document.createElement('span');
+    delSec.className = 'custom-del-section';
+    delSec.textContent = '✕ Reiter löschen';
+    delSec.addEventListener('pointerdown', e => e.stopPropagation());
+    delSec.addEventListener('pointerup', e => { e.stopPropagation(); deleteSection(sec.id); });
+    right.appendChild(delSec);
+
+    const arrow = document.createElement('span');
+    arrow.className = 'toggle-arrow';
+    arrow.textContent = '▼';
+    right.appendChild(arrow);
+    heading.appendChild(right);
+
+    // Drag: gedrückt halten und bewegen = verschieben; kurzer Tap = einklappen
+    let _secTapTimer = null;
+    let _secMoved = false;
+    heading.addEventListener('pointerdown', e => {
+        if (e.target.closest('.custom-title-input,.custom-heading-right')) return;
+        _secMoved = false;
+        _secTapTimer = setTimeout(() => {
+            _secTapTimer = null;
+        }, 300);
+        // Sofort drag-ready (wir starten aber erst beim ersten move)
+        heading._dragStartX = e.clientX;
+        heading._dragStartY = e.clientY;
+        heading._secId      = sec.id;
+        heading.setPointerCapture(e.pointerId);
+    });
+    heading.addEventListener('pointermove', e => {
+        if (!heading._dragStartX) return;
+        const dx = Math.abs(e.clientX - heading._dragStartX);
+        const dy = Math.abs(e.clientY - heading._dragStartY);
+        if (!_secDrag && (dx > 6 || dy > 6)) {
+            _secMoved = true;
+            _secDragStart(heading._secId, heading, e.clientX, e.clientY);
+        }
+        if (_secDrag) { e.preventDefault(); _secDragMove(e.clientX, e.clientY); }
+    });
+    heading.addEventListener('pointerup', e => {
+        heading._dragStartX = null;
+        if (_secDrag) { _secDragEnd(); return; }
+        if (!_secMoved) {
+            // War ein Tap → einklappen
+            const secs = loadSections();
+            const s = secs.find(x => x.id === sec.id);
+            const now = section.classList.toggle('collapsed');
+            if (s) { s.collapsed = now; saveSections(secs); }
+        }
+    });
+    heading.style.cursor = 'grab';
+    section.appendChild(heading);
+
+    // BODY
+    const body  = document.createElement('div');
+    body.className = 'custom-body';
+    const inner = document.createElement('div');
+    inner.className = 'custom-body-inner';
+
+    // Grid: berechne Slots
+    const maxPos    = sec.cards.length ? Math.max(...sec.cards.map(c=>c.pos)) : -1;
+    const totalSlots = Math.max(CUSTOM_COLS, maxPos + 1 + CUSTOM_COLS);
+    const cardByPos  = new Map(sec.cards.map(c=>[c.pos, c]));
+
+    const grid = document.createElement('div');
+    grid.className = 'custom-grid';
+
+    for (let i = 0; i < totalSlots; i++) {
+        if (cardByPos.has(i)) {
+            grid.appendChild(createCardEl(sec.id, cardByPos.get(i)));
+        } else {
+            const slot = document.createElement('div');
+            slot.className    = 'custom-slot';
+            slot.dataset.pos  = i;
+            grid.appendChild(slot);
+        }
+    }
+    inner.appendChild(grid);
+
+    // + Karte hinzufügen
+    const addBtn = document.createElement('div');
+    addBtn.className   = 'custom-add-btn';
+    addBtn.textContent = '+';
+    addBtn.title       = 'Eigenen Sprung hinzufügen';
+    addBtn.addEventListener('click', () => addCard(sec.id));
+    inner.appendChild(addBtn);
+
+    body.appendChild(inner);
+    section.appendChild(body);
+    return section;
+}
+
+/* ================================================================
+   ALLE CUSTOM-SEKTIONEN + ADD-BUTTON RENDERN
+================================================================ */
+function renderAllCustom() {
+    // Bestehende Custom-Elemente entfernen
+    document.querySelectorAll('.custom-section,.add-section-btn').forEach(e => e.remove());
+
+    const main = document.getElementById('mainContent');
+    const secs = loadSections();
+
+    secs.forEach(sec => main.appendChild(renderOneSection(sec)));
+
+    // + Neuen Reiter erstellen
+    const addSecBtn = document.createElement('div');
+    addSecBtn.className   = 'add-section-btn';
+    addSecBtn.innerHTML   = '<span style="font-size:1.2rem;line-height:1">＋</span> Neuen Reiter erstellen';
+    addSecBtn.addEventListener('click', addSection);
+    main.appendChild(addSecBtn);
+}
+
+render();
+</script>
